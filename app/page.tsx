@@ -64,9 +64,21 @@ async function ai(prompt: string): Promise<string> {
   if (!r.ok) throw new Error(d.error || "AI error");
   return d.text as string;
 }
+
 const parseJ = (t: string) => {
-  const m = t.match(/[\[{][\s\S]*[\]}]/);
-  return JSON.parse(m ? m[0] : t);
+  try {
+    // マークダウンの装飾などを綺麗に取り除く
+    const clean = t.replace(/```json/g, "").replace(/```/g, "").trim();
+    return JSON.parse(clean);
+  } catch {
+    const m = t.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
+    if (m) {
+      try {
+        return JSON.parse(m[0]);
+      } catch {}
+    }
+    throw new Error("Invalid JSON format");
+  }
 };
 
 function words(s: string) {
