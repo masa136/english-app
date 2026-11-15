@@ -34,3 +34,25 @@ export async function POST(req: Request) {
           generationConfig,
         }),
       }
+    );
+
+    const data = await r.json();
+    if (!r.ok) {
+      return NextResponse.json(
+        { error: data?.error?.message || "Gemini API error" },
+        { status: 502 }
+      );
+    }
+
+    const text: string = (data?.candidates?.[0]?.content?.parts ?? [])
+      .map((p: { text?: string }) => p.text ?? "")
+      .join("");
+    if (!text) {
+      return NextResponse.json({ error: "empty response" }, { status: 502 });
+    }
+    return NextResponse.json({ text });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ error: "server error" }, { status: 500 });
+  }
+}
