@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 // 汎用のAIエンドポイント。page.tsx の全AI機能（添削・解説・問題生成・会話・メール添削）がここを使います。
-// 環境変数名は既存の /api/evaluate/route.ts と同じものに合わせてください（ここでは GEMINI_API_KEY）。
 export async function POST(req: Request) {
   try {
     const { prompt } = await req.json();
