@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-// 汎用のAIエンドポイント。page.tsx の全AI機能（添削・解説・問題生成・会話・メール添削）がここを使います。
 export async function POST(req: Request) {
   try {
     const { prompt } = await req.json();
@@ -27,7 +26,7 @@ export async function POST(req: Request) {
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": key.trim() },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           generationConfig,
@@ -37,6 +36,7 @@ export async function POST(req: Request) {
 
     const data = await r.json();
     if (!r.ok) {
+      console.error("Gemini API error:", data);
       return NextResponse.json(
         { error: data?.error?.message || "Gemini API error" },
         { status: 502 }
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ text });
   } catch (e) {
-    console.error(e);
+    console.error("Server error:", e);
     return NextResponse.json({ error: "server error" }, { status: 500 });
   }
 }
