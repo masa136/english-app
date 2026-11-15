@@ -1,60 +1,36 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
-export async function POST(request: Request) {
+// 汎用のAIエンドポイント。page.tsx の全AI機能（添削・解説・問題生成・会話・メール添削）がここを使います。
+// 環境変数名は既存の /api/evaluate/route.ts と同じものに合わせてください（ここでは GEMINI_API_KEY）。
+export async function POST(req: Request) {
   try {
-    const { japanese, userEnglish } = await request.json();
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) {
-      return NextResponse.json({ error: 'APIキーが設定されていません' }, { status: 500 });
+    const { prompt } = await req.json();
+    if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 8000) {
+      return NextResponse.json({ error: "invalid prompt" }, { status: 400 });
     }
 
-    const prompt = `
-あなたは優秀な英語講師です。以下の日本語に対するユーザーの英作文を評価・添削してください。
-【日本語】${japanese}
-【ユーザーの回答】${userEnglish}
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) {
+      return NextResponse.json({ error: "GEMINI_API_KEY is not set" }, { status: 500 });
+    }
 
-必ず以下のJSONフォーマットのみ（マークダウン記号なし）で返してください：
-{
-  "isCorrect": trueまたはfalse,
-  "modelAnswer": "最も自然な模範解答の英語",
-  "betterExpression": "よりネイティブらしい別の言い回し（なければ空文字）",
-  "feedback": "修正点や良い点の簡潔なアドバイス（日本語で100文字以内）"
-}
-`;
+    const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    const generationConfig: Record<string, unknown> = {
+      temperature: 0.7,
+      maxOutputTokens: 4096,
+      responseMimeType: "application/json",
+    };
+    if (model.includes("2.5")) {
+      generationConfig.thinkingConfig = { thinkingBudget: 0 };
+    }
 
-    // ネイティブのGeminiエンドポイントに x-goog-api-key ヘッダーで送信（AQ.キー完全対応）
-    const response = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey.trim(),
-        },
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig,
         }),
       }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('Gemini API Error:', data);
-      return NextResponse.json(
-        { error: data.error?.message || 'Gemini APIでエラーが発生しました' },
-        { status: response.status }
-      );
-    }
-
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-
-    return NextResponse.json(JSON.parse(cleanJson));
-  } catch (error) {
-    console.error('Server Error:', error);
-    return NextResponse.json({ error: '添削中にサーバーエラーが発生しました' }, { status: 500 });
-  }
-}
-
