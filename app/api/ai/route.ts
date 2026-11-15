@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   try {
     const { prompt } = await req.json();
-    if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 8000) {
+    if (!prompt || typeof prompt !== "string") {
       return NextResponse.json({ error: "invalid prompt" }, { status: 400 });
     }
 
@@ -12,24 +12,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "GEMINI_API_KEY is not set" }, { status: 500 });
     }
 
-    const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-    const generationConfig: Record<string, unknown> = {
-      temperature: 0.7,
-      maxOutputTokens: 4096,
-      responseMimeType: "application/json",
-    };
-    if (model.includes("2.5")) {
-      generationConfig.thinkingConfig = { thinkingBudget: 0 };
-    }
+    // 安定して動作する標準モデルを使用
+    const model = process.env.GEMINI_MODEL || "gemini-1.5-flash";
 
     const r = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": key.trim() },
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": key.trim(),
+        },
         body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig,
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            responseMimeType: "application/json",
+          },
         }),
       }
     );
@@ -43,12 +42,11 @@ export async function POST(req: Request) {
       );
     }
 
-    const text: string = (data?.candidates?.[0]?.content?.parts ?? [])
-      .map((p: { text?: string }) => p.text ?? "")
-      .join("");
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
     if (!text) {
       return NextResponse.json({ error: "empty response" }, { status: 502 });
     }
+
     return NextResponse.json({ text });
   } catch (e) {
     console.error("Server error:", e);
