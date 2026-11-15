@@ -67,16 +67,18 @@ async function ai(prompt: string): Promise<string> {
 
 const parseJ = (t: string) => {
   try {
-    // マークダウンの装飾などを綺麗に取り除く
-    const clean = t.replace(/```json/g, "").replace(/```/g, "").trim();
+    // マークダウンの装飾（```json など）を完全に除去
+    const clean = t.replace(/```json/gi, "").replace(/```/g, "").trim();
     return JSON.parse(clean);
   } catch {
+    // 万が一テキストが混ざっていても、配列やオブジェクトの部分だけを強制的に切り出す
     const m = t.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
     if (m) {
       try {
         return JSON.parse(m[0]);
       } catch {}
     }
+    console.error("AI Response parse error:", t);
     throw new Error("Invalid JSON format");
   }
 };
