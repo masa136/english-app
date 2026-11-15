@@ -1,23 +1,45 @@
+"use client";
+import React, { useState, useEffect, useCallback } from 'react';
+import { Send, Volume2, Sparkles, CheckCircle2, XCircle, RotateCcw, Play, Pause, ChevronRight } from 'lucide-react';
 
-'client';
-import React, { useState, useCallback } from 'react';
-import { Send, Volume2, Sparkles, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
-
-const QUESTIONS = [
-  { id: 1, jp: "私は昨日、駅で彼に会いました。" },
-  { id: 2, jp: "この本は彼女によって書かれました。" },
-  { id: 3, jp: "お時間を取っていただきありがとうございます。" },
-  { id: 4, jp: "駅までどうやって行けばいいか教えてもらえますか？" },
-  { id: 5, jp: "もし明日晴れれば、私たちは公園に行きます。" }
-];
+const QUESTION_BANK: Record<string, { jp: string }[]> = {
+  "中学文法・基本": [
+    { jp: "私は昨日、駅で彼に会いました。" },
+    { jp: "この本は彼女によって書かれました。" },
+    { jp: "あなたはどのくらい英語を勉強していますか？" },
+    { jp: "もし明日晴れれば、私たちは公園に行きます。" },
+    { jp: "私は音楽を聴きながら走ることが好きです。" }
+  ],
+  "日常会話・フレーズ": [
+    { jp: "お時間を取っていただきありがとうございます。" },
+    { jp: "駅までどうやって行けばいいか教えてもらえますか？" },
+    { jp: "そろそろ行かなければなりません。" },
+    { jp: "それはいい考えですね！" },
+    { jp: "もう一度言っていただけますか？" }
+  ],
+  "ビジネス・丁寧表現": [
+    { jp: "添付のファイルをご確認ください。" },
+    { jp: "来週の火曜日に会議を設定しましょう。" },
+    { jp: "返信が遅れて申し訳ありません。" },
+    { jp: "その件については後ほど折り返しご連絡します。" },
+    { jp: "何かご質問があればお知らせください。" }
+  ]
+};
 
 export default function Home() {
+  const categories = Object.keys(QUESTION_BANK);
+  const [selectedCategory, setSelectedCategory] = useState(categories[0]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userAnswer, setUserAnswer] = useState('');
   const [loading, setLoading] = useState(false);
   const [evaluation, setEvaluation] = useState<any>(null);
+  
+  // タイマー機能
+  const [timeLeft, setTimeLeft] = useState(15);
+  const [isTimerRunning, setIsTimerRunning] = useState(true);
 
-  const currentQ = QUESTIONS[currentIndex];
+  const questions = QUESTION_BANK[selectedCategory];
+  const currentQ = questions[currentIndex];
 
   const speakEnglish = useCallback((text: string) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
@@ -27,12 +49,25 @@ export default function Home() {
     window.speechSynthesis.speak(utterance);
   }, []);
 
+  // カウントダウンタイマーの処理
+  useEffect(() => {
+    if (!isTimerRunning || evaluation) return;
+    if (timeLeft <= 0) {
+      setIsTimerRunning(false);
+      return;
+    }
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [timeLeft, isTimerRunning, evaluation]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userAnswer.trim() || loading) return;
 
     setLoading(true);
-    setEvaluation(null);
+    setIsTimerRunning(false);
 
     try {
       const res = await fetch('/api/evaluate', {
@@ -51,7 +86,7 @@ export default function Home() {
       }
     } catch (err) {
       console.error(err);
-      -alert('通信エラーが発生しました');
+      alert('通信エラーが発生しました');
     } finally {
       setLoading(false);
     }
@@ -60,31 +95,81 @@ export default function Home() {
   const handleNext = () => {
     setUserAnswer('');
     setEvaluation(null);
-    setCurrentIndex((prev) => (prev + 1) % QUESTIONS.length);
+    setTimeLeft(15);
+    setIsTimerRunning(true);
+    setCurrentIndex((prev) => (prev + 1) % questions.length);
+  };
+
+  const handleCategoryChange = (cat: string) => {
+    setSelectedCategory(cat);
+    setCurrentIndex(0);
+    setUserAnswer('');
+    setEvaluation(null);
+    setTimeLeft(15);
+    setIsTimerRunning(true);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between max-w-md mx-auto p-4 font-sans">
-      <header className="flex items-center justify-between py-3 border-b border-slate-200">
-        <div className="flex items-center gap-1.5">
-          <Sparkles className="w-5 h-5 text-indigo-600" />
-          <h1 className="font-bold text-base text-slate-800">AI瞬間英作文 (Gemini)</h1>
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between max-w-md mx-auto select-none font-sans">
+      {/* ヘッダー＆カテゴリー選択 */}
+      <header className="bg-white border-b border-slate-200 px-4 pt-3 pb-3 sticky top-0 z-10">
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="w-5 h-5 text-indigo-600" />
+            <h1 className="font-bold text-base tracking-tight text-slate-800">AI瞬間英作文トレーナー</h1>
+          </div>
+          <span className="text-xs font-semibold bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full">
+            Q.{currentIndex + 1} / {questions.length}
+          </span>
         </div>
-        <span className="text-xs font-semibold bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full">
-          Q.{currentIndex + 1} / {QUESTIONS.length}
-        </span>
+
+        {/* 横スクロールカテゴリータブ */}
+        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => handleCategoryChange(cat)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                selectedCategory === cat
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 active:bg-slate-200'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
       </header>
 
-      <main className="flex-1 py-6 flex flex-col gap-5 justify-center">
-        {/* 問題カード */}
-        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm text-center">
-          <span className="text-xs font-bold text-indigo-500 mb-2 block tracking-wider">この日本語を英語にしよう</span>
-          <p className="text-xl font-bold text-slate-800 leading-relaxed">{currentQ.jp}</p>
+      {/* メインカードエリア */}
+      <main className="flex-1 px-4 py-4 flex flex-col justify-center gap-4">
+        {/* タイマーバー */}
+        <div className="flex items-center justify-between bg-white px-4 py-2.5 rounded-2xl border border-slate-200 shadow-xs">
+          <span className="text-xs font-bold text-slate-500">制限時間</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsTimerRunning(!isTimerRunning)}
+              className="text-indigo-600"
+            >
+              {isTimerRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            </button>
+            <span className={`tabular-nums text-sm font-bold ${timeLeft <= 3 && !evaluation ? 'text-rose-600 animate-pulse' : 'text-slate-700'}`}>
+              {timeLeft}秒
+            </span>
+          </div>
         </div>
 
-        {/* 入力フォーム */}
+        {/* 日本語問題カード */}
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm text-center relative">
+          <span className="text-xs font-bold text-indigo-500 mb-2 block tracking-wider">声に出して英訳しよう</span>
+          <p className="text-xl font-bold leading-relaxed text-slate-800">
+            {currentQ.jp}
+          </p>
+        </div>
+
+        {/* 入力フォーム または AI添削結果 */}
         {!evaluation ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3">
             <textarea
               value={userAnswer}
               onChange={(e) => setUserAnswer(e.target.value)}
@@ -108,26 +193,25 @@ export default function Home() {
             </button>
           </form>
         ) : (
-          /* 判定・添削結果表示エリア */
-          <div className="space-y-4 animate-fadeIn">
+          <div className="space-y-3 animate-fadeIn">
             <div className={`p-5 rounded-3xl border ${evaluation.isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : 'bg-amber-50 border-amber-200 text-amber-950'}`}>
-              <div className="flex items-center gap-2 font-extrabold text-lg mb-2">
+              <div className="flex items-center gap-2 font-extrabold text-base mb-2">
                 {evaluation.isCorrect ? (
                   <>
-                    <CheckCircle2 className="w-6 h-6 text-emerald-600" /> Great! よくできました
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600" /> Great! よくできました
                   </>
                 ) : (
                   <>
-                    <XCircle className="w-6 h-6 text-amber-600" /> もう一歩！
+                    <XCircle className="w-5 h-5 text-amber-600" /> もう一歩！
                   </>
                 )}
               </div>
 
-              <div className="space-y-2 text-sm bg-white/80 p-4 rounded-2xl border border-black/5">
+              <div className="space-y-2 text-xs bg-white/90 p-3.5 rounded-2xl border border-black/5">
                 <div>
-                  <span className="text-xs font-bold text-slate-500 block">模範解答</span>
+                  <span className="text-[10px] font-bold text-slate-500 block">模範解答</span>
                   <div className="flex items-center justify-between gap-2 mt-0.5">
-                    <span className="font-bold text-base text-indigo-950">{evaluation.modelAnswer}</span>
+                    <span className="font-bold text-sm text-indigo-950">{evaluation.modelAnswer}</span>
                     <button
                       onClick={() => speakEnglish(evaluation.modelAnswer)}
                       aria-label="英語を読み上げる"
@@ -140,13 +224,13 @@ export default function Home() {
 
                 {evaluation.betterExpression && (
                   <div>
-                    <span className="text-xs font-bold text-slate-500 block">より自然な表現</span>
+                    <span className="text-[10px] font-bold text-slate-500 block">より自然な表現</span>
                     <span className="font-medium text-slate-800">{evaluation.betterExpression}</span>
                   </div>
                 )}
 
                 <div>
-                  <span className="text-xs font-bold text-slate-500 block">AIアドバイス</span>
+                  <span className="text-[10px] font-bold text-slate-500 block">AIアドバイス</span>
                   <p className="text-slate-700 leading-relaxed">{evaluation.feedback}</p>
                 </div>
               </div>
@@ -154,16 +238,17 @@ export default function Home() {
 
             <button
               onClick={handleNext}
-            className="w-full py-4 bg-slate-800 active:bg-slate-900 text-white font-bold text-base rounded-2xl shadow-md flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"
+              className="w-full py-4 bg-slate-800 active:bg-slate-900 text-white font-bold text-base rounded-2xl shadow-md flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"
             >
               <RotateCcw className="w-5 h-5" /> 次の問題へ進む
+              <ChevronRight className="w-5 h-5" />
             </button>
           </div>
         )}
       </main>
 
-      <footer className="text-center text-xs text-slate-400 py-2">
-        Powered by Google Gemini API (Free Tier)
+      <footer className="text-center text-xs text-slate-400 py-3 border-t border-slate-100">
+        Powered by Google Gemini API
       </footer>
     </div>
   );
