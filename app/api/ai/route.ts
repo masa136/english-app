@@ -12,8 +12,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "GEMINI_API_KEY is not set" }, { status: 500 });
     }
 
-    // 環境変数やモデル名に混ざった余分なスペース・改行を .trim() で完全に除去
-    const model = (process.env.GEMINI_MODEL || "gemini-1.5-flash").trim();
+    // URLパースエラーを完全に防ぐため、モデル名を安全な文字列に直接固定
+    const model = "gemini-1.5-flash";
     const cleanKey = key.trim();
 
     const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
