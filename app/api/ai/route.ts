@@ -12,11 +12,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "GEMINI_API_KEY is not set" }, { status: 500 });
     }
 
-    // 安定して動作する標準モデルを使用
+    // 安定して動作するモデルを指定
     const model = process.env.GEMINI_MODEL || "gemini-1.5-flash";
 
     const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      `[https://generativelanguage.googleapis.com/v1beta/models/$](https://generativelanguage.googleapis.com/v1beta/models/$){model}:generateContent`,
       {
         method: "POST",
         headers: {
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
 
     const data = await r.json();
     if (!r.ok) {
-      console.error("Gemini API error:", data);
+      console.error("Gemini API error details:", data);
       return NextResponse.json(
         { error: data?.error?.message || "Gemini API error" },
         { status: 502 }
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ text });
   } catch (e) {
-    console.error("Server error:", e);
+    console.error("Server execution error:", e);
     return NextResponse.json({ error: "server error" }, { status: 500 });
   }
 }
