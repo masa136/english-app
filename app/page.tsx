@@ -389,21 +389,28 @@ export default function Home() {
   function go(v: View) { stopRec(); setView(v); }
 
   /* AI 問題生成 */
-  async function genMore(kind: "gen" | "adp") {
+    async function genMore(kind: "gen" | "adp") {
     if (busy.current[kind]) return;
     busy.current[kind] = true;
     setGl((s) => ({ ...s, [kind]: true })); setGe((s) => ({ ...s, [kind]: "" }));
     try {
       const seen = kind === "gen" ? genRef.current : adpRef.current;
       const prompt = kind === "gen" ? genPrompt(seen, pRef.current.scene) : adaptPrompt(seen, pRef.current);
-      const a = parseJ(await ai(prompt));
+      const resText = await ai(prompt);
+      const a = parseJ(resText);
       const add: Q[] = (Array.isArray(a) ? a : []).filter((x: any) => x && x.jp && x.en).map((x: any) => [x.jp, x.en, x.point || ""] as Q);
-      if (!add.length) throw new Error("empty");
+      if (!add.length) throw new Error("AIからのデータが空です");
       (kind === "gen" ? setGen : setAdp)((l) => [...l, ...add]);
-    } catch { setGe((s) => ({ ...s, [kind]: "err" })); }
+    } catch (e: any) { 
+      // エラーを隠さず、正確な理由を保持する
+      setGe((s) => ({ ...s, [kind]: e?.message || "不明なエラー" })); 
+    }
     busy.current[kind] = false;
     setGl((s) => ({ ...s, [kind]: false }));
   }
+
+
+  
   useEffect(() => {
     if (!ready || view !== "quiz") return;
     if (cat === ADP && !adp.length && !gl.adp && !ge.adp) genMore("adp");
@@ -827,7 +834,9 @@ issuesは重要なものを最大6件。`));
               {cat === REV
                 ? <>今日復習する問題はありません。<br />「もう一度」「あとでまた」にした問題や、音声添削で80点未満だった問題が、1日後・3日後・7日後に再び出ます。{Object.keys(p.later).length > 0 && <><br />復習待ち: {Object.keys(p.later).length}問</>}</>
                 : loadingList ? <span className="animate-pulse">問題を作成中…</span>
-                : failedList ? "問題を作成できませんでした。" : "AIが新しい問題を作ります。"}
+                
+              : failedList ? `エラー: ${failedList}` : "AIが新しい問題を作ります。"}
+
             </p>
             {cat !== REV && !loadingList && failedList && (
               <button className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-bold" onClick={() => { setGe({ gen: "", adp: "" }); }}>もう一度試す</button>
