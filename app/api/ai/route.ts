@@ -3,13 +3,10 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   try {
     const { prompt } = await req.json();
-    if (!prompt || typeof prompt !== "string") {
-      return NextResponse.json({ error: "invalid prompt" }, { status: 400 });
-    }
-
     const apiKey = process.env.GEMINI_API_KEY;
+
     if (!apiKey) {
-      return NextResponse.json({ error: "APIキーが設定されていません" }, { status: 500 });
+      return NextResponse.json({ error: "APIキー（GEMINI_API_KEY）がVercelに設定されていません" }, { status: 500 });
     }
 
     const response = await fetch(
@@ -22,9 +19,6 @@ export async function POST(req: Request) {
         },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-          },
         }),
       }
     );
@@ -33,24 +27,14 @@ export async function POST(req: Request) {
 
     if (!response.ok) {
       console.error("Gemini API Error:", data);
-      return NextResponse.json(
-        { error: data.error?.message || "Gemini API error" },
-        { status: response.status }
-      );
+      const errMsg = data.error?.message || "Gemini APIでエラーが発生しました";
+      return NextResponse.json({ error: `APIエラー: ${errMsg}` }, { status: response.status });
     }
 
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-    // 【重要】Geminiが返すマークダウン（```json ... ```）や前後の余分な言葉を自動でカットし、純粋なJSON部分だけを抽出する
-    let cleanText = rawText.trim();
-    const jsonMatch = cleanText.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
-    if (jsonMatch) {
-      cleanText = jsonMatch[0];
-    }
-
-    return NextResponse.json({ text: cleanText });
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    return NextResponse.json({ text });
   } catch (error: any) {
     console.error("Server Error:", error);
-    return NextResponse.json({ error: error.message || "Server error" }, { status: 500 });
+    return NextResponse.json({ error: `サーバーエラー: ${error.message || "不明"}` }, { status: 500 });
   }
 }
